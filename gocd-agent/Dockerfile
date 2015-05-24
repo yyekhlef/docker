@@ -1,4 +1,4 @@
-FROM gocd/gocd-agent:14.4.0
+FROM phusion/baseimage:0.9.16
 MAINTAINER Youcef Yekhlef <youcef.yekhlef@zenika.com>
 
 # Install Java.
