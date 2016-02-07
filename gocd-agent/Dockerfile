@@ -26,6 +26,7 @@ RUN sed -i -e 's/DAEMON=Y/DAEMON=N/' /etc/default/go-agent /etc/default/go-agent
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV JAVA_HOME=/usr/lib/jvm/java-8-oracle/
+ENV YYEK true
 
 CMD ["/sbin/my_init"]
 
