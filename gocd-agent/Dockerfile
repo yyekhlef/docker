@@ -1,32 +1,43 @@
-FROM phusion/baseimage:0.9.16
+FROM centos:7
+MAINTAINER "GoCD" <gocd-dev@googlegroups.com>
 MAINTAINER Youcef Yekhlef <youcef.yekhlef@zenika.com>
 
-# Install Java.
-RUN \
-  echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
-  add-apt-repository -y ppa:webupd8team/java && \
-  apt-get update && \
-  apt-get install -y oracle-java8-installer && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/oracle-jdk8-installer
+ARG GO_VERSION="16.8.0-3929"
+ARG DOWNLOAD_URL="https://download.go.cd/binaries"
+ENV TINI_VERSION v0.9.0
 
-RUN rm -rf /etc/service/sshd /etc/my_init.d/00_regen_ssh_host_keys.sh
-RUN apt-get update && apt-get install -y -q unzip git
+RUN yum update -y && \
+    yum install -y wget && \
+    wget --no-cookies --no-check-certificate \
+    --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" \
+    "http://download.oracle.com/otn-pub/java/jdk/8u102-b14/jdk-8u102-linux-x64.rpm" && \
+    yum localinstall -y jdk-8u102-linux-x64.rpm && \
+    rm -f jdk-8u102-linux-x64.rpm && \
+    yum clean all
 
-RUN mkdir /etc/service/go-agent
-ADD go-agent-start.sh /etc/service/go-agent/run
-# RUN chmod +x /etc/service/go-agent/run
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*; \
+yum install -y java-1.8.0-openjdk-headless git;
 
-ADD http://download.go.cd/gocd-deb/go-agent-14.4.0-1356.deb /tmp/go-agent.deb
+VOLUME [ "/sys/fs/cgroup" ]
+
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
+ENTRYPOINT ["/tini", "--"]
+
+
+ADD $DOWNLOAD_URL/$GO_VERSION/rpm/go-agent-$GO_VERSION.noarch.rpm /tmp/go-agent.rpm
 
 WORKDIR /tmp
-RUN dpkg -i /tmp/go-agent.deb
-RUN sed -i -e 's/DAEMON=Y/DAEMON=N/' /etc/default/go-agent /etc/default/go-agent
-
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
+RUN yum install -y /tmp/go-agent.rpm; yum clean all; rm -f /etc/default/go-server
 ENV JAVA_HOME=/usr/lib/jvm/java-8-oracle/
-ENV YYEK true
 
-CMD ["/sbin/my_init"]
+# Run your program under Tini
+CMD PRODUCTION_MODE=N /usr/share/go-agent/agent.sh
 
